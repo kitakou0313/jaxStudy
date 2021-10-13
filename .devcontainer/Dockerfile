@@ -13,6 +13,9 @@ RUN if [ "${NODE_VERSION}" != "none" ]; then su vscode -c "umask 0002 && . /usr/
 # RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
 #    && rm -rf /tmp/pip-tmp
 
+RUN pip install pep8
+RUN pip install --upgrade autopep8
+
 RUN pip3 install --upgrade "jax[cpu]"
 
 # [Optional] Uncomment this section to install additional OS packages.
