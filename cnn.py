@@ -1,18 +1,25 @@
-from jax._src.api import value_and_grad, vmap
-from jax._src.numpy.lax_numpy import array
-from jax.scipy.special import logsumexp
-from jax.experimental import optimizers
-from jax import random, jit
+from jax._src.lax.lax import conv
+from jax.experimental import stax
 import jax.numpy as np
+from jax.experimental import optimizers
+
+from jax._src.api import value_and_grad, vmap
+
+import time
+
+from jax import random, jit
+from jax.experimental.stax import (
+    BatchNorm, Conv, Dense, Flatten, Relu, LogSoftmax
+)
 
 
 from torch.utils.data.dataloader import DataLoader
 from torchvision import datasets, transforms
 
-import time
 
-key = random.PRNGKey(1)
+num_classes = 10
 batch_size = 100
+
 
 train_loader = DataLoader(
     datasets.MNIST(
@@ -38,57 +45,23 @@ test_loader = DataLoader(
     ), batch_size=batch_size, shuffle=True
 )
 
-
-def initialize_mlp(sizes, key):
-    keys = random.split(
-        key, len(sizes)
-    )
-
-    def initialize_layer(m, n, key, scale=1e-2):
-        w_key, b_key = random.split(key)
-        return scale * random.normal(
-            w_key, (n, m)
-        ), scale * random.normal(
-            b_key, (n,)
-        )
-    return [
-        initialize_layer(m, n, k) for m, n, k in zip(
-            sizes[:-1], sizes[1:], keys
-        )
-    ]
-
-
-layer_sizes = [784, 512, 512, 10]
-
-params = initialize_mlp(
-    layer_sizes, key
+init_fun, conv_net = stax.serial(
+    Conv(32, (5, 5), (2, 2), padding="SAME"),
+    BatchNorm(), Relu,
+    Conv(32, (5, 5), (2, 2), padding="SAME"),
+    BatchNorm(), Relu,
+    Conv(10, (3, 3), (2, 2), padding="SAME"),
+    BatchNorm(), Relu,
+    Conv(10, (3, 3), (2, 2), padding="SAME"), Relu,
+    Flatten,
+    Dense(num_classes),
+    LogSoftmax
 )
 
+key = random.PRNGKey(1)
 
-def forward_pass(params, in_array):
-    """
-    forward pass
-    """
-    def relu_layer(params, x):
-        def ReLU(x):
-            return np.maximum(0, x)
-        return ReLU(np.dot(params[0], x) + params[1])
-
-    activations = in_array
-
-    for w, b in params[:-1]:
-        activations = relu_layer([w, b], activations)
-
-    final_w, final_b = params[-1]
-    logits = np.dot(
-        final_w, activations
-    ) + final_b
-
-    return logits - logsumexp(logits)
-
-
-batch_forward = vmap(
-    forward_pass, in_axes=(None, 0), out_axes=0
+_, params = init_fun(
+    key, (batch_size, 1, 28, 28)
 )
 
 
@@ -101,42 +74,37 @@ def one_hot(x, k, dtype=np.float32):
     )
 
 
-def loss(params, in_array, targets):
-
-    preds = batch_forward(
-        params, in_array
-    )
-
-    return -np.sum(preds * targets)
-
-
-num_classes = 10
-
-
 def accuracy(params, data_loader):
+    """
+    docstring
+    """
     acc_total = 0
-
     for batch_idx, (data, target) in enumerate(data_loader):
-        images = np.array(data).reshape(
-            data.size(0), 28*28
-        )
-        targets = one_hot(
-            np.array(target), num_classes
-        )
+        images = np.array(data)
+        targets = one_hot(np.array(target), num_classes)
 
         target_class = np.argmax(
             targets, axis=1
         )
 
         predicted_class = np.argmax(
-            batch_forward(params, images), axis=1
+            conv_net(params, images),
+            axis=1
         )
 
         acc_total += np.sum(
             predicted_class == target_class
         )
 
-    return acc_total/len(data_loader.dataset)
+    return acc_total / len(data_loader.dataset)
+
+
+def loss(params, images, targets):
+    """
+    docstring
+    """
+    preds = conv_net(params, images)
+    return -np.sum(preds*targets)
 
 
 step_size = 1e-3
@@ -157,9 +125,6 @@ def update(params, x, y, opt_state):
     return get_params(
         opt_state
     ), opt_state, value
-
-
-num_epochs = 10
 
 
 def run_mnist_training_loop(num_epochs, opt_state, net_type="MLP"):
@@ -184,6 +149,10 @@ def run_mnist_training_loop(num_epochs, opt_state, net_type="MLP"):
                     data.size(0), 28*28
                 )
 
+            elif net_type == "CNN":
+                # No flattening of the input required for the CNN
+                x = np.array(data)
+
             y = one_hot(
                 np.array(target), num_classes
             )
@@ -204,6 +173,7 @@ def run_mnist_training_loop(num_epochs, opt_state, net_type="MLP"):
     return train_loss, log_acc_train, log_acc_test
 
 
+num_epochs = 10
 train_loss, train_log, test_log = run_mnist_training_loop(
-    num_epochs, opt_state, net_type="CNP"
+    num_epochs, opt_state, net_type="CNN"
 )
