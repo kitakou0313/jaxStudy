@@ -12,7 +12,7 @@ def generate_ou_process(batch_size, num_dims, mu, tau, sigma, noise_std, dt=0.1)
     """
     テスト用データ生成
     """
-    ou_x = onp.zeros(batch_size, num_dims)
+    ou_x = onp.zeros((batch_size, num_dims))
     ou_x[:, 0] = onp.random.random(batch_size)
 
     for t in range(1, num_dims):
@@ -27,3 +27,18 @@ def generate_ou_process(batch_size, num_dims, mu, tau, sigma, noise_std, dt=0.1)
     )
 
     return ou_x, ou_x_noise
+
+
+x_0, mu, tau, sigma, dt = 0, 1, 2, 0.5, 0.1
+noise_std = 0.1
+num_dims, batch_size = 100, 50
+
+x, x_tilde = generate_ou_process(
+    batch_size=batch_size,
+    num_dims=num_dims,
+    mu=mu,
+    tau=tau,
+    sigma=sigma,
+    noise_std=noise_std,
+    dt=dt
+)
