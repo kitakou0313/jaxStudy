@@ -1,3 +1,7 @@
+from jax._src.prng import _bit_stats
+from jax.experimental.stax import Dense
+import neural_tangents as nt
+from neural_tangents import stax
 import matplotlib.pyplot as plt
 import jax.numpy as np
 
@@ -73,3 +77,13 @@ plt.figure(figsize=(6, 4))
 plot_fn(train, test)
 plt.legend(loc="upper left")
 plt.savefig("./plot/TrainDatas")
+
+
+init_fn, apply_fn, kernel_fun = stax.serial(
+    stax.Dense(512, W_std=1.5, b_std=0.05), stax.Erf(),
+    stax.Dense(512, W_std=1.5, b_std=0.05), stax.Erf(),
+    stax.Dense(1, W_std=1.5, b_std=0.05)
+)
+
+apply_fn = jit(apply_fn)
+kernel_fun = jit(kernel_fun, static_argnums=(2,))
