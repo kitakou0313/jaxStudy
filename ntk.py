@@ -1,4 +1,5 @@
 from jax._src.prng import _bit_stats
+from jax._src.tree_util import tree_structure
 from jax.experimental.stax import Dense
 import neural_tangents as nt
 from neural_tangents import stax
@@ -87,3 +88,53 @@ init_fn, apply_fn, kernel_fun = stax.serial(
 
 apply_fn = jit(apply_fn)
 kernel_fun = jit(kernel_fun, static_argnums=(2,))
+
+prior_draws = []
+
+for _ in range(10):
+    key, net_key = random.split(key)
+    _, params = init_fn(net_key, (-1, 1))
+    prior_draws += [apply_fn(
+        params, test_xs
+    )]
+
+plot_fn(train, test)
+
+for p in prior_draws:
+    plt.plot(test_xs, p, linewidth=3, alpha=0.7)
+    plt.legend(['train', '$f(x)$', 'random draw'], loc='upper left')
+
+plt.savefig("./plot/firstOutput")
+
+kernel = kernel_fun(test_xs, test_xs, "nngp")
+std_dev = np.sqrt(np.diag(kernel))
+
+plot_fn(train, test)
+
+plt.fill_between(np.reshape(test_xs, (-1,)), 2 *
+                 std_dev, -2 * std_dev, alpha=0.4)
+
+for p in prior_draws:
+    plt.plot(test_xs, p, linewidth=3, alpha=0.5)
+plt.savefig("./plot/nngpOutput")
+
+# NTK
+ntk_mean, ntk_covariance = nt.predict.gp_inference(
+    kernel_fun, train_xs, train_ys, test_xs,
+    diag_reg=float(1e-4), get='ntk', compute_cov=True)
+
+ntk_mean = np.reshape(ntk_mean, (-1,))
+ntk_std = np.sqrt(np.diag(ntk_covariance))
+
+plot_fn(train, test)
+
+plt.plot(test_xs, ntk_mean, "b-", linewidth=3)
+plt.fill_between(
+    np.reshape(test_xs, (-1)),
+    ntk_mean - 2 * ntk_std,
+    ntk_mean + 2 * ntk_std,
+    color='blue', alpha=0.2)
+
+
+plt.legend(['Train', 'f(x)', 'Gradient Descent (NTK)'], loc='upper left')
+plt.savefig("./plot/ntk_perdict_output")
