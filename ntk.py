@@ -14,6 +14,7 @@ import functools
 
 from IPython.display import set_matplotlib_formats
 import matplotlib
+from neural_tangents.utils.utils import named_tuple_factory
 import seaborn as sns
 sns.set_style("darkgrid", {"axes.facecolor": ".95"})
 sns.set()
@@ -119,22 +120,31 @@ for p in prior_draws:
 plt.savefig("./plot/nngpOutput")
 
 # NTK
-ntk_mean, ntk_covariance = nt.predict.gp_inference(
-    kernel_fun, train_xs, train_ys, test_xs,
-    diag_reg=float(1e-4), get='ntk', compute_cov=True)
+perdict_fun = nt.predict.gradient_descent_mse_ensemble(
+    kernel_fun, train_xs, train_ys, diag_reg=1e-4
+)
 
+ntk_mean, ntk_covariance = perdict_fun(
+    x_test=test_xs, get='ntk', compute_cov=True
+)
+print(ntk_mean)
 ntk_mean = np.reshape(ntk_mean, (-1,))
+print(ntk_mean)
 ntk_std = np.sqrt(np.diag(ntk_covariance))
 
 plot_fn(train, test)
 
-plt.plot(test_xs, ntk_mean, "b-", linewidth=3)
+plt.plot(test_xs, ntk_mean, 'b-', linewidth=3)
 plt.fill_between(
     np.reshape(test_xs, (-1)),
     ntk_mean - 2 * ntk_std,
     ntk_mean + 2 * ntk_std,
     color='blue', alpha=0.2)
 
+plt.xlim([-np.pi, np.pi])
+plt.ylim([-1.5, 1.5])
 
-plt.legend(['Train', 'f(x)', 'Gradient Descent (NTK)'], loc='upper left')
-plt.savefig("./plot/ntk_perdict_output")
+plt.legend(['Train', 'f(x)', 'Bayesian Inference', 'Gradient Descent'],
+           loc='upper left')
+
+plt.savefig("./plot/ntk_prediction")
