@@ -194,3 +194,56 @@ plt.legend(
     loc='upper left')
 
 plt.savefig("./plot/train_log")
+
+# comopare to train finite network
+learning_rate = 0.1
+training_steps = 10000
+
+opt_init, opt_update, get_params = optimizers.sgd(
+    learning_rate
+)
+opt_update = jit(opt_update)
+loss = jit(lambda params, x, y: 0.5 * np.mean(apply_fn(params, x) - y) ** 2)
+grad_loss = jit(lambda state, x, y: grad(loss)(get_params(state), x, y))
+
+train_losses = []
+test_losses = []
+
+opt_state = opt_init(params)
+
+for i in range(training_steps):
+    opt_state = opt_update(i, grad_loss(
+        opt_state, *train
+    ), opt_state)
+
+    train_losses += [loss(get_params(opt_state), *train)]
+    test_losses += [loss(get_params(opt_state), *test)]
+
+plt.subplot(1, 2, 1)
+
+plt.loglog(ts, ntk_train_loss_mean, linewidth=3)
+plt.loglog(ts, ntk_test_loss_mean, linewidth=3)
+
+plt.loglog(ts, train_losses, 'k-', linewidth=2)
+plt.loglog(ts, test_losses, 'k-', linewidth=2)
+
+plt.legend(['Infinite Train', 'Infinite Test', 'Finite'])
+
+plt.subplot(1, 2, 2)
+
+plot_fn(train, None)
+
+plt.plot(test_xs, ntk_mean, 'b-', linewidth=3)
+plt.fill_between(
+    np.reshape(test_xs, (-1)),
+    ntk_mean - 2 * ntk_std,
+    ntk_mean + 2 * ntk_std,
+    color='blue', alpha=0.2)
+
+plt.plot(test_xs, apply_fn(get_params(opt_state), test_xs), 'k-', linewidth=2)
+
+plt.legend(
+    ['Train', 'Infinite Network', 'Finite Network'],
+    loc='upper left')
+
+plt.savefig("./plot/compare_finite_network")
