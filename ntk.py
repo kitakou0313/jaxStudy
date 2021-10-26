@@ -20,6 +20,18 @@ sns.set_style("darkgrid", {"axes.facecolor": ".95"})
 sns.set()
 
 
+def loss_fn(predict_fn, ys, t, xs=None):
+    mean, cov = predict_fn(t=t, get='ntk', x_test=xs, compute_cov=True)
+    mean = np.reshape(mean, mean.shape[:1] + (-1,))
+    var = np.diagonal(cov, axis1=1, axis2=2)
+    ys = np.reshape(ys, (1, -1))
+
+    mean_predictions = 0.5 * np.mean(ys ** 2 - 2 * mean * ys + var + mean ** 2,
+                                     axis=1)
+
+    return mean_predictions
+
+
 # Define train datas
 train_points = 5
 test_points = 50
@@ -29,7 +41,7 @@ noise_scale = 1e-1
 def target_fn(x): return np.sin(x)
 
 
-key = random.PRNGKey(11)
+key = random.PRNGKey(397)
 key, x_key, y_key = random.split(key=key, num=3)
 
 # generate test data
@@ -148,3 +160,37 @@ plt.legend(['Train', 'f(x)', 'Bayesian Inference', 'Gradient Descent'],
            loc='upper left')
 
 plt.savefig("./plot/ntk_prediction")
+
+# inference finite time
+ts = np.arange(
+    0, 10 ** 3, 10**-1
+)
+
+print(ts)
+
+ntk_train_loss_mean = loss_fn(perdict_fun, train_ys, ts)
+ntk_test_loss_mean = loss_fn(perdict_fun, test_ys, ts, test_xs)
+
+plt.subplot(1, 2, 1)
+
+plt.loglog(ts, ntk_train_loss_mean, linewidth=3)
+plt.loglog(ts, ntk_test_loss_mean, linewidth=3)
+
+plt.legend(['Infinite Train', 'Infinite Test'])
+
+plt.subplot(1, 2, 2)
+
+plot_fn(train, None)
+
+plt.plot(test_xs, ntk_mean, 'b-', linewidth=3)
+plt.fill_between(
+    np.reshape(test_xs, (-1)),
+    ntk_mean - 2 * ntk_std,
+    ntk_mean + 2 * ntk_std,
+    color='blue', alpha=0.2)
+
+plt.legend(
+    ['Train', 'Infinite Network'],
+    loc='upper left')
+
+plt.savefig("./plot/train_log")
