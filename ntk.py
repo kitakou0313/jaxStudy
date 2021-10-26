@@ -203,7 +203,7 @@ opt_init, opt_update, get_params = optimizers.sgd(
     learning_rate
 )
 opt_update = jit(opt_update)
-loss = jit(lambda params, x, y: 0.5 * np.mean(apply_fn(params, x) - y) ** 2)
+loss = jit(lambda params, x, y: 0.5 * np.mean((apply_fn(params, x) - y)**2))
 grad_loss = jit(lambda state, x, y: grad(loss)(get_params(state), x, y))
 
 train_losses = []
