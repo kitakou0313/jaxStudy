@@ -6,6 +6,8 @@ from neural_tangents import stax
 import matplotlib.pyplot as plt
 import jax.numpy as np
 
+from tqdm import tqdm
+
 from jax import random
 from jax.experimental import optimizers
 from jax import jit, grad, vmap
@@ -247,3 +249,91 @@ plt.legend(
     loc='upper left')
 
 plt.savefig("./plot/compare_finite_network")
+
+
+# emsanble train
+def train_network(key):
+    train_losses = []
+    test_losses = []
+
+    _, params = init_fn(key, (-1, 1))
+    opt_state = opt_init(params)
+
+    for i in tqdm(range(training_steps)):
+        train_losses += [np.reshape(
+            loss(get_params(opt_state), *train), (1,)
+        )]
+
+        test_losses += [np.reshape(
+            loss(get_params(opt_state), *test), (1,)
+        )]
+
+        opt_state = opt_update(i, grad_loss(
+            opt_state, *train
+        ), opt_state)
+
+    train_losses = np.concatenate(train_losses)
+    test_losses = np.concatenate(test_losses)
+
+    return get_params(
+        opt_state
+    ), train_losses, test_losses
+
+
+params, train_loss, test_loss = train_network(
+    key
+)
+
+ensamble_size = 10
+ensemble_key = random.split(
+    key, ensamble_size
+)
+
+params, train_loss, test_loss = vmap(
+    train_network
+)(ensemble_key)
+
+plt.subplot(1, 2, 1)
+
+mean_train_loss = np.mean(train_loss, axis=0)
+mean_test_loss = np.mean(test_loss, axis=0)
+
+plt.loglog(ts, ntk_train_loss_mean, linewidth=3)
+plt.loglog(ts, ntk_test_loss_mean, linewidth=3)
+
+plt.loglog(ts, mean_train_loss, 'k-', linewidth=2)
+plt.loglog(ts, mean_test_loss, 'k-', linewidth=2)
+
+plt.xlim([10 ** 0, 10 ** 3])
+
+plt.xscale('log')
+plt.yscale('log')
+
+plt.legend(['Infinite Train', 'Infinite Test', 'Finite Ensemble'])
+
+plt.subplot(1, 2, 2)
+
+plot_fn(train, None)
+
+plt.plot(test_xs, ntk_mean, 'b-', linewidth=3)
+plt.fill_between(
+    np.reshape(test_xs, (-1)),
+    ntk_mean - 2 * ntk_std,
+    ntk_mean + 2 * ntk_std,
+    color='blue', alpha=0.2)
+
+ensemble_fx = vmap(apply_fn, (0, None))(params, test_xs)
+
+mean_fx = np.reshape(np.mean(ensemble_fx, axis=0), (-1,))
+std_fx = np.reshape(np.std(ensemble_fx, axis=0), (-1,))
+
+plt.plot(test_xs, mean_fx - 2 * std_fx, 'k--', label='_nolegend_')
+plt.plot(test_xs, mean_fx + 2 * std_fx, 'k--', label='_nolegend_')
+plt.plot(test_xs, mean_fx, linewidth=2, color='black')
+
+plt.legend(['Train', 'Infinite Network', 'Finite Ensemble'], loc='upper left')
+
+plt.xlim([-np.pi, np.pi])
+plt.ylim([-1.5, 1.5])
+
+plt.savefig('./plot/compare_to_ensamble')
