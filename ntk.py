@@ -5,6 +5,7 @@ import neural_tangents as nt
 from neural_tangents import stax
 import matplotlib.pyplot as plt
 import jax.numpy as np
+from seaborn.utils import saturate
 
 from tqdm import tqdm
 
@@ -280,18 +281,119 @@ def train_network(key):
     ), train_losses, test_losses
 
 
-params, train_loss, test_loss = train_network(
-    key
+# params, train_loss, test_loss = train_network(
+#     key
+# )
+
+# ensamble_size = 10
+# ensemble_key = random.split(
+#     key, ensamble_size
+# )
+
+# params, train_loss, test_loss = vmap(
+#     train_network
+# )(ensemble_key)
+
+# plt.subplot(1, 2, 1)
+
+# mean_train_loss = np.mean(train_loss, axis=0)
+# mean_test_loss = np.mean(test_loss, axis=0)
+
+# plt.loglog(ts, ntk_train_loss_mean, linewidth=3)
+# plt.loglog(ts, ntk_test_loss_mean, linewidth=3)
+
+# plt.loglog(ts, mean_train_loss, 'k-', linewidth=2)
+# plt.loglog(ts, mean_test_loss, 'k-', linewidth=2)
+
+# plt.xlim([10 ** 0, 10 ** 3])
+
+# plt.xscale('log')
+# plt.yscale('log')
+
+# plt.legend(['Infinite Train', 'Infinite Test', 'Finite Ensemble'])
+
+# plt.subplot(1, 2, 2)
+
+# plot_fn(train, None)
+
+# plt.plot(test_xs, ntk_mean, 'b-', linewidth=3)
+# plt.fill_between(
+#     np.reshape(test_xs, (-1)),
+#     ntk_mean - 2 * ntk_std,
+#     ntk_mean + 2 * ntk_std,
+#     color='blue', alpha=0.2)
+
+# ensemble_fx = vmap(apply_fn, (0, None))(params, test_xs)
+
+# mean_fx = np.reshape(np.mean(ensemble_fx, axis=0), (-1,))
+# std_fx = np.reshape(np.std(ensemble_fx, axis=0), (-1,))
+
+# plt.plot(test_xs, mean_fx - 2 * std_fx, 'k--', label='_nolegend_')
+# plt.plot(test_xs, mean_fx + 2 * std_fx, 'k--', label='_nolegend_')
+# plt.plot(test_xs, mean_fx, linewidth=2, color='black')
+
+# plt.legend(['Train', 'Infinite Network', 'Finite Ensemble'], loc='upper left')
+
+# plt.xlim([-np.pi, np.pi])
+# plt.ylim([-1.5, 1.5])
+
+# plt.savefig('./plot/compare_to_ensamble')
+
+# Define other architectures
+ResBlock = stax.serial(
+    stax.FanOut(2),
+    stax.parallel(
+        stax.serial(
+            stax.Erf(),
+            stax.Dense(512, W_std=1.1, b_std=0)
+        ),
+        stax.Identity()
+    ),
+    stax.FanInSum()
 )
 
-ensamble_size = 10
+init_fn, apply_fn, kernel_fn = stax.serial(
+    stax.Dense(512, W_std=1, b_std=0),
+    ResBlock, ResBlock, stax.Erf(),
+    stax.Dense(1, W_std=1.5, b_std=0)
+)
+
+apply_fn = jit(apply_fn)
+kernel_fn = jit(kernel_fn, static_argnums=(2,))
+
+ensamble_size = 5
+learning_rate = 0.1
+ts = np.arange(
+    0, 10**3, learning_rate
+)
+
+opt_init, opt_update, get_params = optimizers.sgd(
+    learning_rate
+)
+
+opt_update = jit(opt_update)
+
+key, = random.split(key, 1)
 ensemble_key = random.split(
     key, ensamble_size
 )
 
-params, train_loss, test_loss = vmap(
-    train_network
-)(ensemble_key)
+params, train_loss, test_loss = vmap(train_network)(ensemble_key)
+
+perdict_fn = nt.predict.gradient_descent_mse_ensemble(
+    kernel_fn, train_xs, train_ys, diag_reg=1e-4
+)
+ntk_mean, ntk_var = perdict_fn(
+    x_test=test_xs, get="ntk", compute_cov=True
+)
+
+ntk_mean = np.reshape(ntk_mean, (-1,))
+ntk_std = np.sqrt(np.diag(
+    ntk_var
+))
+
+ntk_train_loss_mean = loss_fn(perdict_fn, train_ys, ts)
+ntk_test_loss_mean = loss_fn(perdict_fn, test_ys, ts, test_xs)
 
 plt.subplot(1, 2, 1)
 
@@ -335,5 +437,4 @@ plt.legend(['Train', 'Infinite Network', 'Finite Ensemble'], loc='upper left')
 
 plt.xlim([-np.pi, np.pi])
 plt.ylim([-1.5, 1.5])
-
-plt.savefig('./plot/compare_to_ensamble')
+plt.savefig("./plot/resnet")
