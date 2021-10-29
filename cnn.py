@@ -1,4 +1,3 @@
-from jax._src.lax.lax import conv
 from jax.experimental import stax
 import jax.numpy as np
 from jax.experimental import optimizers
