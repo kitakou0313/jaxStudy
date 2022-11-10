@@ -3,7 +3,7 @@ from jax import grad, jit, vmap, value_and_grad
 from jax import random
 
 
-def loss_func(x: np.ndarray, trg_x: np.ndarray) -> np.ndarray:
+def loss_func(X: np.ndarray, X_trg: np.ndarray) -> np.ndarray:
     """
     trg_xの各行との距離にexpした値を返す
     """
@@ -14,14 +14,22 @@ if __name__ == "__main__":
     # 到達できる候補ベクトル候補周辺に遷移するような損失関数を定義して微分可能か検証
 
     key = random.PRNGKey(1)
-    x_1 = np.array([
-        1, 1, 1, 1, 1
-    ], dtype=np.float32)
 
-    data = random.normal(
-        key=key, shape=(5, 5), dtype=np.float32
-    )
-    data = np.array(
+    X = np.array(
+        [
+            [1.0,1.0,1.0,1.0,1.0],
+            [2.0,2.0,2.0,2.0,2.0]
+        ],dtype=np.float32)
+
+    x_1_trg = np.array(
+        [[1.5, 1.5, 1.5, 1.5, 1.5],
+         [1.5, 1.5, 1.5, 1.5, 1.5],
+         [1.5, 1.5, 1.5, 1.5, 1.5],
+         [1.5, 1.5, 1.5, 1.5, 1.5],
+         [1.5, 1.5, 1.5, 1.5, 1.5],
+         [1.5, 1.5, 1.5, 1.5, 1.5]], dtype=np.float32)
+
+    x_2_trg = np.array(
         [[1.5, 1.5, 1.5, 1.5, 1.5],
          [1.5, 1.5, 1.5, 1.5, 1.5],
          [1.5, 1.5, 1.5, 1.5, 1.5],
