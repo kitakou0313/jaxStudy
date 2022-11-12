@@ -3,14 +3,17 @@ from jax import grad, jit, vmap, value_and_grad
 from jax import random
 
 
-def loss_func(X: np.ndarray, X_trg_list: list) -> np.ndarray:
+def loss_func(X: np.ndarray, X_trg_list: list, Y_trg:np.ndarray) -> np.ndarray:
     """
     trg_xの各行との距離にexpした値を返す
     """
     loss_sum = 0
 
+    l2_loss = np.sum(np.linalg.norm(X-Y_trg, ord=2, axis=1)**2)
+    loss_sum += l2_loss
+
     for x, X_trg in zip(X, X_trg_list):
-        loss_sum += np.sum(np.exp(-(np.linalg.norm(X_trg - x, ord=2, axis=1)**2)))
+        loss_sum -= np.sum(np.exp(-(np.linalg.norm(X_trg - x, ord=2, axis=1)**2)))
 
     return loss_sum
 
@@ -55,10 +58,19 @@ if __name__ == "__main__":
         x_1_trg, x_2_trg
     ]
 
+    Y_trg = np.array(
+        [[3.,3.,3.,3.,3.],
+        [6.,6.,6.,6.,6.,]]
+    ,dtype=np.float32)
+
     grad_loss_func = jit(grad(
         loss_func, argnums=0
     ))
 
-    
-    print(loss_func(X=X, X_trg_list=X_trg))
-    print(grad_loss_func(X, X_trg))
+    for iteration in range(30):
+        d_X = grad_loss_func(X, X_trg, Y_trg)
+        X += -0.1*d_X
+
+        print("Iteraion", iteration)
+        print(X)
+        print(loss_func(X, X_trg, Y_trg))
