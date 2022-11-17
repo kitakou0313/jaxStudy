@@ -42,10 +42,10 @@ if __name__ == "__main__":
         stax.Dense(1, W_std=1.5, b_std=0.05)
     )
 
-    # kernel_fn = jit(kernel_fn, static_argnums=(2,))
-    # grads_fn = jit(grad(adv_loss, argnums=0), static_argnums=(4, 5, 7))
-    kernel_fn = (kernel_fn)
-    grads_fn = grad(adv_loss, argnums=0)
+    # kernel_fn = (kernel_fn)
+    # grads_fn = (grad(adv_loss, argnums=0))
+    kernel_fn = jit(kernel_fn,static_argnums=(2,))
+    grads_fn = jit(grad(adv_loss, argnums=0),static_argnums=(4, 5, 7))
 
     x_train = np.array(
         [[1,1,1,1,1],
