@@ -15,7 +15,7 @@ def model_fn(x_train, x_test, y_train, kernel_fn, t=None,diag_reg=1e-4):
 
     return fx
 
-def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, targeted=False, diag_reg=1e-4, x_train_regs=None):
+def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, targeted=False, diag_reg=1e-4, x_train_regs=None, alpha=0., beta=0.):
     """
     adv loss + ベクトルに関する制約項
     """
@@ -32,9 +32,9 @@ def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, ta
     # regularization loss
     regularization_loss = 0
     for x, X_trg in zip(x_train, x_train_regs):
-        regularization_loss -= np.sum(np.exp(-((np.linalg.norm(X_trg - x, ord=2, axis=1)**2))))
+        regularization_loss -= np.sum(np.exp(-((np.linalg.norm(X_trg - x, ord=2, axis=1)**2) / beta)))
 
-    return l2_norm_loss + regularization_loss
+    return l2_norm_loss + alpha*regularization_loss
 
 if __name__ == "__main__":
     init_fn, apply_fn, kernel_fn = stax.serial(
@@ -75,24 +75,27 @@ if __name__ == "__main__":
          [2.5, 2.5, 2.5, 2.5, 2.5], 
          [3., 3., 3., 3., 3.]], dtype=np.float32)
 
+    alpha = 1.0
+    beta = 5.0
+
 
     # print(np.linalg.norm(x_1_trg - X[0],ord=2, axis=1))
     X_trg = [
         x_1_trg, x_2_trg
     ]
 
-    print(adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg))
-    print(grads_fn(x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg))
+    print(adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg, alpha=alpha, beta=beta))
+    print(grads_fn(x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg,alpha=alpha, beta=beta))
 
     loss_list = []
     for iteration in range(30):
-        d_x = grads_fn(x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg)
+        d_x = grads_fn(x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg,alpha=alpha, beta=beta)
         x_train -= 0.1*d_x
 
         print(iteration+1)
         print(d_x)
 
-        loss =adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg) 
+        loss =adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg, alpha=alpha, beta=beta) 
         loss_list.append(loss)
         print(loss)
         print(model_fn(x_train, x_test, y_train, kernel_fn))
