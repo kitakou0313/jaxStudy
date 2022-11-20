@@ -96,7 +96,7 @@ if __name__ == "__main__":
         print(d_x)
 
         loss =adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg, alpha=alpha, beta=beta) 
-        loss_list.append(loss)
+        loss_list.append(float(loss))
         print(loss)
         print(model_fn(x_train, x_test, y_train, kernel_fn))
 
