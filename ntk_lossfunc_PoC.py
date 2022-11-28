@@ -32,8 +32,9 @@ def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, ta
     # regularization loss
     regularization_loss = 0
     for x, X_trg in zip(x_train, x_train_regs):
-        regularization_loss -= np.sum(np.exp(-((np.linalg.norm(X_trg - x, ord=2, axis=1)**2) / beta)))
+        regularization_loss += np.sum(np.exp(-((np.linalg.norm(X_trg - x, ord=2, axis=1)**2) / beta)))
 
+    print(l2_norm_loss, regularization_loss)
     return l2_norm_loss + alpha*regularization_loss
 
 if __name__ == "__main__":
@@ -48,9 +49,12 @@ if __name__ == "__main__":
     grads_fn = jit(grad(adv_loss, argnums=0),static_argnums=(4, 5, 7))
 
     x_train = np.array(
-        [[1,1,1,1,1],
-        [2,2,2,2,2]],
+        [np.array([1,1,1,1,1], dtype=np.float32),
+        np.array([1,1,1,1,1], dtype=np.float32)],
         dtype=np.float32)
+    
+    x_train_ori = x_train.copy()
+
     y_train = np.array(
         [5,5], dtype=np.float32
     )
@@ -75,7 +79,7 @@ if __name__ == "__main__":
          [2.5, 2.5, 2.5, 2.5, 2.5], 
          [3., 3., 3., 3., 3.]], dtype=np.float32)
 
-    alpha = 1.0
+    alpha = 7.0
     beta = 5.0
 
 
@@ -90,19 +94,20 @@ if __name__ == "__main__":
     loss_list = []
     for iteration in range(30):
         d_x = grads_fn(x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg,alpha=alpha, beta=beta)
-        x_train -= 0.1*d_x
+        x_train += 0.1*d_x
 
         print(iteration+1)
-        print(d_x)
+        # print(d_x)
 
         loss =adv_loss(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, kernel_fn=kernel_fn, x_train_regs=X_trg, alpha=alpha, beta=beta) 
         loss_list.append(float(loss))
-        print(loss)
-        print(model_fn(x_train, x_test, y_train, kernel_fn))
+        # print(loss)
+        # print(model_fn(x_train, x_test, y_train, kernel_fn))
 
         print()
 
     print(loss_list)
 
-
-
+    print("Alpha", alpha, "beta", beta)
+    print(x_train_ori)
+    print(x_train)
